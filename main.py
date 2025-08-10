@@ -3,6 +3,10 @@
 
 import logging
 import multiprocessing
+import schedule
+import sys
+import signal
+import time
 
 logging.getLogger().setLevel(logging.DEBUG)
 file_handler = logging.FileHandler(
@@ -26,15 +30,25 @@ console_handler.setFormatter(
 console_handler.setLevel(logging.DEBUG)
 logging.getLogger().addHandler(console_handler)
 
+pool = None
 
-def worker(a, b):
-    try:
-        logging.debug(f"开始处理任务[{a} + {b}]")
-    except Exception as e:
-        logging.error(f"处理任务[{a} + {b}]失败: {e}")
-        return e
-    logging.debug(f"处理任务[{a} + {b}]成功")
-    return a + b
+
+def worker():
+    global pool
+    if pool is None:
+        logging.error("进程池未初始化")
+        return
+
+    result = pool.apply_async(actual_worker)
+    result.get()
+
+
+def actual_worker():
+    pass
+
+
+def init_worker():
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
 
 
 if (__name__ == "__main__"):
@@ -42,18 +56,28 @@ if (__name__ == "__main__"):
         multiprocessing.set_start_method("fork", force=True)
     except Exception as e:
         logging.error("multiprocessing.set_start_method failed: %s", e)
-        exit(1)
+        sys.exit(1)
 
-    pool = multiprocessing.Pool(processes=multiprocessing.cpu_count() * 2)
-    result1 = pool.apply_async(worker, (1, 2))
-    result2 = pool.apply_async(worker, (3, 4))
-    result3 = pool.apply_async(worker, (5, 6))
+    pool = multiprocessing.Pool(
+        processes=multiprocessing.cpu_count() * 2,
+        initializer=init_worker,
+    )
 
-    logging.debug(f"result1: {result1.get()}")
-    logging.debug(f"result2: {result2.get()}")
-    logging.debug(f"result3: {result3.get()}")
-
-    # 关闭进程池，阻止新的任务提交
-    pool.close()
-    # 等待所有任务完成
-    pool.join()
+    schedule.every(3).seconds.do(worker)
+    try:
+        while True:
+            schedule.run_pending()
+            time.sleep(1)
+            logging.info("定时任务调度器运行中...")
+    except KeyboardInterrupt:
+        logging.info("收到中断信号，正在退出...")
+    except Exception as e:
+        logging.error("schedule failed: %s", e)
+    finally:
+        if pool:
+            logging.info("正在关闭进程池...")
+            pool.terminate()
+            pool.join()
+            logging.info("进程池已关闭")
+        logging.info("程序已退出")
+        sys.exit(0)
