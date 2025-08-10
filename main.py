@@ -4,14 +4,27 @@
 import logging
 import multiprocessing
 
-logging.basicConfig(
+logging.getLogger().setLevel(logging.DEBUG)
+file_handler = logging.FileHandler(
     filename="run.log",
-    filemode="a",
-    format=
-    "[%(asctime)s.%(msecs)03d][%(levelname)s][%(filename)s:%(lineno)s][%(process)d]%(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    level=logging.DEBUG,
+    mode="a",
+    encoding="utf-8",
 )
+file_handler.setFormatter(
+    logging.Formatter(
+        "[%(asctime)s.%(msecs)03d][%(levelname)s][%(filename)s:%(lineno)s][%(process)d]%(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    ))
+file_handler.setLevel(logging.DEBUG)
+logging.getLogger().addHandler(file_handler)
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(
+    logging.Formatter(
+        "[%(asctime)s.%(msecs)03d][%(levelname)s][%(filename)s:%(lineno)s][%(process)d]%(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    ))
+console_handler.setLevel(logging.DEBUG)
+logging.getLogger().addHandler(console_handler)
 
 
 def worker(a, b):
